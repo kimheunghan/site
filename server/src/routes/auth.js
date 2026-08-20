@@ -318,7 +318,9 @@ router.post('/signup', rateLimit(5, 10 * 60 * 1000), async (req, res, next) => {
     const name     = String(req.body?.name || '').trim();
     const email    = String(req.body?.email || '').trim();
     const phone    = String(req.body?.phone || '').trim();
-    const note     = String(req.body?.signup_note || '').trim().slice(0, 500);
+    // 담당 역할 (총괄책임자 / 실무책임자 / 참여연구원)
+    const DUTIES = ['LEAD', 'MANAGER', 'RESEARCHER'];
+    const duty = DUTIES.includes(req.body?.duty) ? req.body.duty : null;
     const orgId    = Number(req.body?.org_id) || null;
 
     if (!/^[A-Za-z0-9._-]{4,50}$/.test(username)) {
@@ -329,7 +331,8 @@ router.post('/signup', rateLimit(5, 10 * 60 * 1000), async (req, res, next) => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return res.status(400).json({ error: '올바른 이메일을 입력하세요. (아이디·비밀번호 찾기에 사용됩니다)' });
     }
-    if (!orgId) return res.status(400).json({ error: '소속 기관을 선택하세요.' });
+    if (!orgId) return res.status(400).json({ error: '기관을 선택하세요.' });
+    if (!duty)  return res.status(400).json({ error: '담당 역할을 선택하세요.' });
 
     // 허용 도메인이 지정되어 있으면 해당 메일 주소만 가입할 수 있다
     const domains = config.signup.allowedEmailDomains;
@@ -351,13 +354,13 @@ router.post('/signup', rateLimit(5, 10 * 60 * 1000), async (req, res, next) => {
     const auto = config.signup.autoApprove;
     const { rows } = await db.query(
       `INSERT INTO wr.users
-         (username, password_hash, name, email, phone, org_id, role, approval_status, signup_note, approved_at)
+         (username, password_hash, name, email, phone, org_id, role, approval_status, duty, approved_at)
        VALUES ($1, $2, $3, $4, $5, $6, 'USER', $7::varchar, $8,
                CASE WHEN $7::varchar = 'APPROVED' THEN now() ELSE NULL END)
        ON CONFLICT (username) DO NOTHING
        RETURNING id, username`,
       [username, auth.hashPassword(password), name, email, phone || null, orgId,
-       auto ? 'APPROVED' : 'PENDING', note || null]
+       auto ? 'APPROVED' : 'PENDING', duty]
     );
     if (!rows[0]) return res.status(409).json({ error: '이미 사용 중인 아이디입니다.' });
 

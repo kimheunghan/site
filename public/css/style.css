@@ -110,6 +110,11 @@ a { color: var(--primary); }
 
 /* ------------------------------------------------------------------ 폼 */
 label.field { display: block; margin-bottom: 12px; }
+
+/* 특정 입력 칸만 배경색으로 강조한다. 테두리는 두지 않는다. */
+.field-hl { background: var(--primary-lt); border: 0; border-radius: var(--radius); padding: 12px; margin-bottom: 12px; }
+.field-hl > label.field:last-child { margin-bottom: 0; }
+.field-hl > label.field > span { color: var(--primary-dk); }
 label.field > span { display: block; font-size: 12.5px; color: var(--text-dim); margin-bottom: 4px; font-weight: 600; }
 
 input[type=text], input[type=password], input[type=email], input[type=number],
@@ -200,25 +205,15 @@ table.grid td.num { text-align: right; font-variant-numeric: tabular-nums; }
   vertical-align: top;
 }
 .report-table col.c-no    { width: 46px; }
-.report-table col.c-title { width: 21%; }
 .report-table col.c-cell  { width: auto; }
-.report-table col.c-act   { width: 92px; }
 
 .cell-no { text-align: center; padding: 10px 0; color: var(--text-dim); font-weight: 700; background: #fafbfd; }
-.cell-act { padding: 8px; text-align: center; background: #fafbfd; }
-.cell-act .btn { width: 100%; margin-bottom: 4px; }
 
 /* 과제명 칸도 계획/실적과 같은 편집기를 쓴다.
    배경색만 살짝 달리해 구분하고, 테두리·그림자는 두지 않는다. */
 /* 배경색은 편집 영역이 아니라 셀에 준다.
    편집 영역에 배경을 두면 그 안의 글을 복사할 때 background-color 가
    인라인 스타일로 딸려가 다른 칸/인쇄물까지 오염된다. */
-.report-table td:nth-child(2) { background: #fdfdf6; }
-.ed-title .editor-area {
-  background: transparent;
-  font-weight: 600;
-  min-height: 120px;
-}
 
 /* ------------------------------------------------------------------ 에디터 */
 .editor { display: flex; flex-direction: column; min-height: 150px; }
@@ -230,11 +225,10 @@ table.grid td.num { text-align: right; font-variant-numeric: tabular-nums; }
   border-bottom: 1px solid var(--border);
 }
 
-/* 표 위에 하나만 두는 공용 툴바 (스크롤해도 따라옴) */
+/* 표 위 공용 툴바. 화면을 내려도 따라오지 않고 제자리에 둔다
+   (sticky 로 두면 상단바 밑에 달라붙어 내용을 가린다) */
 .editor-toolbar.shared {
-  position: sticky;
-  top: 52px;                 /* 상단바 높이만큼 */
-  z-index: 40;
+  position: static;
   gap: 3px;
   padding: 7px 12px;
   border-top: 1px solid var(--border);
@@ -247,11 +241,84 @@ table.grid td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .editor-toolbar.shared input:disabled { cursor: default; }
 
 .toolbar-hint {
-  padding: 6px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 4px 14px;
   font-size: 12.5px;
+  line-height: 1.45;          /* 줄 높이를 여기서 고정 */
   color: var(--text-dim);
   background: #fffdf2;
   border-bottom: 1px solid var(--border);
+}
+/* 업무 추가·삭제: 노란 안내줄 위에서 묻히지 않도록 흰 박스로 영역을 구분한다.
+   줄 높이를 키우지 않도록 위아래 여백을 최소로 둔다. */
+.toolbar-hint .row-ctl {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  white-space: nowrap;
+  /* 노란 안내줄과 확실히 구분되도록 옅은 파랑으로 채운다 */
+  background: linear-gradient(#fbfcfe, #eef2f7);
+  border: 1px solid #c9d4e0;
+  border-radius: 15px;
+  padding: 3px 7px 3px 12px;
+  box-shadow: 0 1px 2px rgba(20, 34, 51, .10);
+}
+.toolbar-hint .row-ctl b {
+  font-size: 12.5px;
+  color: var(--primary-dk);
+  font-weight: 800;
+  letter-spacing: -.2px;
+  margin-right: 1px;
+  color: var(--text);
+}
+/* 두 버튼의 크기를 완전히 같게 고정한다.
+   .btn.icon 의 min-width(30px) 가 남아 있으면 폭이 들쑥날쑥해지므로 함께 덮어쓴다. */
+.toolbar-hint .row-ctl .btn.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 28px;
+  min-width: 28px;
+  height: 21px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 1px 0 rgba(20, 34, 51, .12);
+  transition: background .12s, box-shadow .12s, transform .05s;
+}
+/* 강한 원색 대신 흰 버튼에 기호 색으로만 구분한다 */
+.toolbar-hint .row-ctl .btn.icon:not(.danger) {
+  background: linear-gradient(#ffffff, #f2f6fb);
+  border-color: #b7cde5;
+  color: var(--primary);
+}
+.toolbar-hint .row-ctl .btn.icon:not(.danger):hover:not(:disabled) {
+  background: linear-gradient(#f4f8fc, #e4eef8);
+  border-color: var(--primary);
+}
+.toolbar-hint .row-ctl .btn.icon.danger {
+  background: linear-gradient(#ffffff, #faf3f2);
+  border-color: #ddb9b3;
+  color: #b4503f;
+}
+.toolbar-hint .row-ctl .btn.icon.danger:hover:not(:disabled) {
+  background: linear-gradient(#fdf6f5, #f6e6e3);
+  border-color: #c9796c;
+}
+/* 누를 때 살짝 들어가는 느낌 */
+.toolbar-hint .row-ctl .btn.icon:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 2px rgba(20, 34, 51, .18);
 }
 .editor-toolbar .sep { width: 1px; height: 18px; background: var(--border-dk); margin: 0 4px; }
 .editor-toolbar button {
@@ -439,14 +506,12 @@ table.grid td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .hidden { display: none !important; }
 
 @media print {
-  .topbar, .editor-toolbar, .cell-act, .no-print { display: none !important; }
+  .topbar, .editor-toolbar, .no-print { display: none !important; }
   .wrap { max-width: none; padding: 0; }
   .panel { border: none; box-shadow: none; }
 }
 
 @media (max-width: 820px) {
-  .report-table col.c-title { width: 30%; }
-  .report-table col.c-act { width: 70px; }
   .wrap { padding: 12px; }
   .topbar { padding: 0 12px; gap: 8px; }
   .topbar h1 { font-size: 15px; }
@@ -511,6 +576,30 @@ h3.sec-title {
 }
 h3.sec-title:first-child { margin-top: 4px; }
 
+/* 목록 제목(건수)과 쪽 이동을 표 바로 위 한 줄에 둔다.
+   밑줄은 관리자 화면의 구역 제목과 같은 모양이 되도록 줄 전체에 긋는다. */
+.list-head {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 10px;
+  margin: 22px 0 8px; padding-bottom: 6px; border-bottom: 2px solid var(--primary);
+}
+.list-head h3.sec-title { margin: 0; padding: 0; border-bottom: 0; }
+.list-head .list-tools { display: flex; gap: 10px; align-items: center; }
+/* 내려받기 안내 문구 — 단추 왼쪽에 조용히 붙는다 */
+.dl-note { font-size: 12px; color: var(--text-dim); white-space: nowrap; }
+/* 내려받기 단추 — 목록 위에서 눈에 띄되 조회 단추보다는 얌전하게 */
+.btn.dl-btn {
+  background: var(--primary-lt);
+  border-color: #b9d0ea;
+  color: var(--primary-dk);
+  padding: 5px 12px;
+  box-shadow: 0 1px 2px rgba(20, 34, 51, .08);
+}
+.btn.dl-btn:hover:not(:disabled) {
+  background: var(--primary); border-color: var(--primary); color: #fff;
+}
+.btn.dl-btn .dl-ico { font-size: 15px; line-height: 1; margin-top: -1px; }
+.list-head #list-pager { display: flex; gap: 6px; align-items: center; }
+
 /* 체크박스 한 줄 */
 label.check {
   display: flex; align-items: center; gap: 7px;
@@ -526,17 +615,9 @@ body.brush-armed .editor-area { cursor: cell; }
 
 /* 버튼 옆 표식과 하단 안내 문구 */
 .mark { color: var(--danger); font-weight: 800; }
-.hint-note {
-  margin: 12px 0 0;
-  padding: 9px 12px;
-  background: #fffdf2;
-  border: 1px solid #ecdfae;
-  border-radius: var(--radius);
-  font-size: 12.5px;
-  line-height: 1.6;
-  color: var(--text-dim);
-}
-.hint-note b { color: var(--text); }
+.danger-text { color: var(--danger); font-weight: 700; }
+.warn-text { color: var(--warn); font-weight: 700; }
+.compact-list { margin: 6px 0 0; padding-left: 20px; }
 
 /* 상단바의 소속·이름 (클릭하면 내 정보 수정) */
 .topbar button.who {
@@ -560,3 +641,135 @@ body.brush-armed .editor-area { cursor: cell; }
   color: var(--text-dim); background: rgba(0, 0, 0, .06);
   padding: 0 4px; border-radius: 7px; vertical-align: 1px;
 }
+
+.summary-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.6;
+  max-height: 3.2em;
+  overflow-wrap: anywhere;
+}
+
+/* 기관별 제출 추이 매트릭스 */
+.matrix .rate { font-size: 10.5px; color: var(--text-dim); font-weight: 600; margin-top: 1px; }
+.matrix tr.total-row th, .matrix tr.total-row td {
+  background: #eef2f7; font-weight: 700; border-top: 2px solid var(--border-dk);
+}
+.matrix thead th { font-size: 11.5px; line-height: 1.35; }
+
+/* ------------------------------------------------ 주차 선택 검색줄 */
+/* 라벨과 입력이 세로로 쌓이면 버튼과 밑선이 어긋나므로,
+   버튼을 입력창과 같은 높이·같은 바닥선에 맞춰 나란히 놓는다. */
+.search-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.search-bar .sb-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+}
+.search-bar .sb-field > span {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.search-bar .sb-field > select,
+.search-bar .sb-field > input {
+  height: 34px;
+}
+.search-bar .sb-btn {
+  height: 34px;
+  flex: 0 0 auto;
+  padding: 0 18px;
+  font-size: 13px;
+}
+
+/* 추가/삭제 아이콘 버튼 (+ , －) */
+.btn.icon {
+  min-width: 30px;
+  padding: 4px 0;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+
+/* 작성 화면 상단 안내(등록된 보고서입니다 …) — 선택줄과 간격을 두고 높이는 낮게 */
+#write-status { margin-top: 12px; }
+#write-status .alert {
+  padding: 7px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 0;
+}
+#write-status .alert + .alert { margin-top: 6px; }
+
+/* 표 제목의 대상 기간 표기 */
+.report-table th .th-date {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+/* 패널 제목 옆 건수 표시 (예: 증적자료 첨부 (2건)) */
+.title-count { color: var(--primary); font-weight: 700; font-size: 14px; margin-left: 2px; }
+
+/* 검색줄에서 값이 고정된 항목을 글자로만 보여줄 때 (예: 작성자의 소속 기관) */
+.search-bar .sb-static {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  padding: 0 2px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 보고 주차는 지나치게 늘어나지 않도록 상한을 둔다.
+   (제한이 없으면 검색줄 전체를 차지해 기관이 붙어 버린다) */
+.search-bar .sb-week { max-width: 62%; }
+
+/* 검색줄에서 오른쪽 끝으로 밀어 붙이는 항목 (예: 기관)
+   블록만 오른쪽으로 보내고, 그 안의 라벨·값은 왼쪽 정렬로 맞춘다. */
+.search-bar .sb-right { margin-left: auto; text-align: left; }
+.search-bar .sb-right > span { text-align: left; }
+.search-bar .sb-right .sb-static { justify-content: flex-start; }
+.search-bar .sb-right > select { min-width: 200px; }
+
+/* 상단바의 권한 표시 */
+.topbar .role-tag {
+  font-size: 11px; font-weight: 700;
+  background: rgba(255, 255, 255, .22); color: #fff;
+  padding: 1px 7px; border-radius: 9px; margin-left: 3px;
+}
+
+/* 너비를 지정한 대로 지키는 표.
+   이렇게 하지 않으면 긴 요약글이 열을 밀어내 다른 열이 눌리고 말줄임도 듣지 않는다. */
+table.grid.fixed { table-layout: fixed; min-width: 1320px; }
+table.grid.fixed td { overflow: hidden; text-overflow: ellipsis; }
+/* 기관·참여인력처럼 좁은 칸에서 글자가 한 자씩 끊기지 않게 */
+table.grid.fixed td.col-org, table.grid.fixed td.col-author { word-break: keep-all; }
+
+/* 조회 목록의 내용 요약 — 항목마다 한 줄, 길면 말줄임(…) */
+table.grid td.summary { color: var(--text-dim); line-height: 1.6; }
+table.grid td.summary .sum-line {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  min-width: 0;
+}
+table.grid td.summary .sum-more { color: var(--text-dim); font-size: 12px; opacity: .8; }

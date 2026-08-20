@@ -59,13 +59,16 @@ CREATE TABLE wr.users (
     -- 관리자가 승인해야 APPROVED 가 되어 로그인할 수 있다.
     approval_status VARCHAR(20) NOT NULL DEFAULT 'APPROVED',
     signup_note    TEXT,
+    -- 담당 역할: LEAD=총괄책임자, MANAGER=실무책임자, RESEARCHER=참여연구원
+    duty           VARCHAR(20),
     approved_at    TIMESTAMPTZ,
     approved_by    INTEGER     REFERENCES wr.users(id) ON DELETE SET NULL,
     last_login_at  TIMESTAMPTZ,
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT users_role_chk CHECK (role IN ('USER', 'ORG_ADMIN', 'ADMIN')),
-    CONSTRAINT users_approval_status_chk CHECK (approval_status IN ('PENDING', 'APPROVED', 'REJECTED'))
+    CONSTRAINT users_approval_status_chk CHECK (approval_status IN ('PENDING', 'APPROVED', 'REJECTED')),
+    CONSTRAINT users_duty_chk CHECK (duty IS NULL OR duty IN ('LEAD', 'MANAGER', 'RESEARCHER'))
 );
 COMMENT ON TABLE  wr.users                 IS '로그인 사용자';
 COMMENT ON COLUMN wr.users.role            IS 'USER=작성자, ORG_ADMIN=기관 관리자, ADMIN=전체 관리자';
@@ -82,8 +85,8 @@ CREATE TRIGGER trg_users_updated
 
 
 -- ---------------------------------------------------------------------
--- 주차 마스터 (월요일 ~ 일요일 기준)
---   예) 2025-08-13(수)~08-19(화) 처럼 임의 구간도 쓸 수 있도록
+-- 주차 마스터 (목요일 ~ 수요일 기준)
+--   예) 2026-08-13(목)~08-19(수) 처럼 임의 구간도 쓸 수 있도록
 --       start_date / end_date 를 직접 보관한다.
 -- ---------------------------------------------------------------------
 CREATE TABLE wr.report_weeks (
@@ -92,12 +95,12 @@ CREATE TABLE wr.report_weeks (
     week_no     INTEGER     NOT NULL,
     start_date  DATE        NOT NULL UNIQUE,
     end_date    DATE        NOT NULL,
-    label       VARCHAR(80) NOT NULL,             -- '2025년 33주차 (08/13~08/19)'
-    is_open     BOOLEAN     NOT NULL DEFAULT TRUE,-- FALSE = 마감(작성/수정 불가)
+    label       VARCHAR(80) NOT NULL,             -- '17주차 (2026/08/13목~08/19수)'
+    is_open     BOOLEAN     NOT NULL DEFAULT TRUE,-- 사용하지 않음 (마감 기능 제거)
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT report_weeks_range_chk CHECK (end_date >= start_date)
 );
-COMMENT ON TABLE  wr.report_weeks         IS '주차 마스터. 관리자가 is_open 으로 마감 제어';
+COMMENT ON TABLE  wr.report_weeks         IS '주차 마스터';
 
 CREATE INDEX idx_report_weeks_start ON wr.report_weeks(start_date DESC);
 
@@ -144,11 +147,11 @@ CREATE TABLE wr.report_items (
     id              SERIAL       PRIMARY KEY,
     report_id       INTEGER      NOT NULL REFERENCES wr.reports(id) ON DELETE CASCADE,
     sort_order      INTEGER      NOT NULL DEFAULT 0,
-    task_title      TEXT         NOT NULL DEFAULT '',   -- 업무명 (정제된 HTML)
+    task_title      TEXT         NOT NULL DEFAULT '',   -- (미사용) 구 버전 업무명
     plan_html       TEXT         NOT NULL DEFAULT '',   -- ① 당초 계획
     result_html     TEXT         NOT NULL DEFAULT '',   -- ② 추진 실적
     progress_rate   NUMERIC(5,1),                       -- (미사용) 진도율 %
-    next_plan_html  TEXT,                               -- (미사용) 향후 계획
+    next_plan_html  TEXT,                               -- ③ 향후 계획
     created_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
     CONSTRAINT report_items_rate_chk
@@ -156,7 +159,7 @@ CREATE TABLE wr.report_items (
 );
 COMMENT ON TABLE  wr.report_items                IS '주간보고 상세(업무별 계획/실적)';
 COMMENT ON COLUMN wr.report_items.progress_rate  IS '(향후확장) 진도율 - 현재 UI 미노출';
-COMMENT ON COLUMN wr.report_items.next_plan_html IS '(향후확장) 향후계획 - 현재 UI 미노출';
+COMMENT ON COLUMN wr.report_items.next_plan_html IS '③ 향후 계획';
 
 CREATE INDEX idx_report_items_report ON wr.report_items(report_id, sort_order);
 

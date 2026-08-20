@@ -3,7 +3,7 @@
 #
 #    APP : 192.168.200.115 (Ubuntu 22.04 LTS, podman 4.9.3, 8 Core)  ← 이 파일로 기동
 #    DB  : 192.168.200.116 (Rocky Linux,    podman 5.8.2, 16 Core)  ← docker-compose.db.yml 로 별도 기동
-#    외부 : http://183.101.26.137:<APP_PORT>
+#    외부 : http://183.101.26.137:<APP_PORT>   (개방 포트 범위 16000~16999)
 #
 #    podman-compose -f docker-compose.prod.yml up -d
 #
@@ -25,7 +25,7 @@ services:
 
       # ---- 원격 DB (192.168.200.116) ----
       DB_HOST: "${DB_HOST:?DB_HOST 를 .env 에 설정하세요 (예: 192.168.200.116)}"
-      DB_PORT: ${DB_PORT:-5432}
+      DB_PORT: ${DB_PORT:-16432}      # RDB 가 호스트에 노출한 포트 (16000~16999)
       DB_NAME: ${DB_NAME:-weekly_report}
       DB_USER: ${DB_USER:-wruser}
       DB_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD 를 .env 에 설정하세요}"
@@ -39,6 +39,8 @@ services:
       UPLOAD_DIR: /app/uploads
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
 
+      SSL_CERT_FILE: ${SSL_CERT_FILE:-}
+      SSL_KEY_FILE: ${SSL_KEY_FILE:-}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_SECURE: ${SMTP_SECURE:-false}
@@ -62,10 +64,12 @@ services:
       # 증적자료는 호스트 디렉터리에 보관해 백업이 쉽도록 한다
       # (:z = SELinux 라벨 재지정. Ubuntu 에서는 무시되므로 그대로 두어도 됨)
       - ${UPLOAD_HOST_DIR:-./data/uploads}:/app/uploads:z
+      - ./certs:/app/certs:ro,z
 
     ports:
-      # 외부 공개 포트. 확정되면 .env 의 APP_PORT 만 바꾸면 됩니다.
-      - "${APP_PORT:-8080}:8080"
+      # 외부 공개 포트. .env 의 APP_PORT 로 지정합니다.
+      # 192.168.200.115 는 16000~16999 만 개방되어 있으므로 그 범위에서 고르세요.
+      - "${APP_PORT:-16080}:8080"
 
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/api/health || exit 1"]
@@ -77,3 +81,9 @@ services:
 
     extra_hosts:
       - "wr-db:${DB_HOST:-192.168.200.116}"
+
+    # pasta : 접속자의 실제 IP 가 그대로 전달된다.
+    # 기본 방식(rootlessport)은 출발지 주소를 중계기 주소로 바꿔 버려
+    # 활동 로그에 컨테이너 내부 주소만 남는다.
+    # DB 는 원래부터 다른 서버(192.168.200.116)에 붙으므로 영향이 없다.
+    network_mode: pasta
