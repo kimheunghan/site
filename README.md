@@ -8,6 +8,61 @@
 - 데이터베이스: **PostgreSQL 16** (`wr` 스키마)
 - 배포: **Podman 4.9+/5.x**, podman-compose 또는 Docker Compose V2 호환
 
+
+## 시스템 아키텍처
+
+### 프론트엔드
+
+- 순수 HTML, CSS, JavaScript
+- React, Vue 같은 프레임워크는 사용하지 않음
+- Node.js 애플리케이션이 정적 파일로 제공
+- 화면: `public/app.html`
+- 동작: `public/js/app.js`
+- 디자인: `public/css/style.css`
+
+### 백엔드
+
+- Node.js 20 + Express 기반 REST API
+- 로그인·세션 인증, 보고서 CRUD, 관리자 기능, 첨부파일, Excel 일괄등록 처리
+- Excel 처리: ExcelJS
+- 파일 업로드: Multer
+
+### 데이터베이스
+
+- PostgreSQL 16
+- `wr` 스키마 사용
+- Node.js `pg` 드라이버로 연결
+
+### 컨테이너 배포
+
+- Podman/Docker Compose 호환 구성
+- 앱 컨테이너: `wr-app`
+- DB 컨테이너: `wr-db`
+- `wr-app`이 프론트엔드 정적 파일과 백엔드 REST API를 함께 서비스
+
+> 전체 구조: **순수 JavaScript 프론트엔드 + Node.js/Express 백엔드 + PostgreSQL**
+
+## 현재 운영 배포
+
+- APP: `192.168.200.115:16000` → `wr-app:8080`
+- RDB: `192.168.200.116:16432` → `wr-db:5432`
+- 내부 접속: `http://192.168.200.115:16000`
+- 외부 예정 주소: `http://183.101.26.137:16080` (**현재 NAT 미설정으로 접속 불가**)
+- 예정 DNAT: `183.101.26.137:16080` → `192.168.200.115:16000`
+- APP 경로: `/home/bi/weekly-report-gcp`
+- 첨부 경로: `/home/bi/weekly-report-gcp/uploads`
+- DB 경로: `/home/bi/weekly-report-db/data/pgdata`
+
+```bash
+# APP 상태 및 헬스체크
+podman ps --filter name=wr-app
+curl http://192.168.200.115:16000/api/health
+
+# APP 재기동
+cd /home/bi/weekly-report-gcp
+podman compose -f docker-compose.prod.yml up -d --no-build
+```
+
 ---
 
 ## 1. 기술 구성
@@ -155,16 +210,18 @@ podman-compose -f docker-compose.yml up -d app
 |---|---|---|---|---|
 | **RDB** | `192.168.200.116` | 16 Core | Rocky Linux (최신) | 5.8.2 |
 | **APP** (web/was) | `192.168.200.115` | 8 Core | Ubuntu 22.04 LTS | 4.9.3 |
-| 외부 접속 | `http://183.101.26.137:16080` | — | **개방 포트 16000~16999** · `.env` 의 `APP_PORT` 로 지정 | |
+| 외부 예정 주소 | `http://183.101.26.137:16080` | — | **현재 NAT 미설정으로 접속 불가** | |
 
 ```
- 인터넷 ──▶ 183.101.26.137:16080        (개방 포트 16000~16999)
+ 인터넷 ──▶ 183.101.26.137:16080  (예정, 현재 NAT 미설정)
+                    │ DNAT 예정
+                    ▼ 192.168.200.115:16000
                     │
                     ▼
         ┌───────────────────────┐         ┌──────────────────────┐
         │ APP  192.168.200.115  │ 16432   │ RDB  192.168.200.116 │
         │  wr-app (Node 20)     │────────▶│  wr-db (PostgreSQL16)│
-        │  볼륨: ./data/uploads │         │  볼륨: ./data/pgdata │
+        │  볼륨: ./uploads │         │  볼륨: ./data/pgdata │
         └───────────────────────┘         └──────────────────────┘
 ```
 
@@ -174,7 +231,8 @@ podman-compose -f docker-compose.yml up -d app
 >
 > | 용도 | 포트 | 비고 |
 > |---|---|---|
-> | 웹 서비스 (APP) | `16080` | `.env` 의 `APP_PORT` |
+> | 웹 서비스 (APP 내부) | `16000` | `.env` 의 `APP_PORT` |
+> | 외부 예정 포트 | `16080` | NAT 설정 후 내부 `16000`으로 전달 |
 > | PostgreSQL (RDB) | `16432` | `.env` 의 `DB_PORT`. 컨테이너 내부는 5432 그대로 |
 >
 > 포트를 바꾸려면 `.env` 값만 수정하면 되며, 코드 수정은 필요 없습니다.
@@ -224,7 +282,7 @@ podman-compose -f docker-compose.yml up -d app
 ## 5. 빠른 시작 (신규 개발 서버)
 
 ```bash
-cd weekly-report
+cd weekly-report-gcp
 
 # 1) .env 생성 + 비밀값 자동 생성
 bash scripts/gen-secrets.sh
@@ -288,8 +346,8 @@ scp dist/postgres-16-alpine.tar dist/weekly-report-deploy-*.tar.gz  user@192.168
 ssh user@192.168.200.116
 
 podman load -i postgres-16-alpine.tar
-mkdir -p ~/weekly-report && tar xzf weekly-report-deploy-*.tar.gz -C ~/weekly-report
-cd ~/weekly-report
+mkdir -p ~/weekly-report-db && tar xzf weekly-report-deploy-*.tar.gz -C ~/weekly-report-db
+cd ~/weekly-report-db
 
 cp .env.example .env
 bash scripts/gen-secrets.sh          # ← 여기서 나온 DB_PASSWORD 를 APP 서버에도 동일하게 사용
@@ -313,8 +371,8 @@ scp dist/weekly-report-*.tar dist/weekly-report-deploy-*.tar.gz  user@192.168.20
 ssh user@192.168.200.115
 
 podman load -i weekly-report-*.tar
-mkdir -p ~/weekly-report && tar xzf weekly-report-deploy-*.tar.gz -C ~/weekly-report
-cd ~/weekly-report
+mkdir -p ~/weekly-report-gcp && tar xzf weekly-report-deploy-*.tar.gz -C ~/weekly-report-gcp
+cd ~/weekly-report-gcp
 
 cp .env.example .env
 vi .env
@@ -323,13 +381,13 @@ vi .env
 `.env` 에서 다음 값을 채웁니다.
 
 ```ini
-APP_PORT=16080                      # ← 16000~16999 범위에서만 외부 접속 가능
+APP_PORT=16000                      # ← 16000~16999 범위에서만 외부 접속 가능
 DB_HOST=192.168.200.116
 DB_PORT=16432                       # ← RDB 가 호스트에 노출한 포트
 DB_PASSWORD=<DB 서버에서 생성된 값과 동일하게>
 SESSION_SECRET=<openssl rand -hex 32>
 ADMIN_PASSWORD=<초기 관리자 비밀번호>
-UPLOAD_HOST_DIR=/opt/weekly-report/uploads
+UPLOAD_HOST_DIR=./uploads
 ```
 
 ```bash
@@ -338,7 +396,9 @@ bash scripts/deploy.sh status
 bash scripts/deploy.sh logs
 ```
 
-접속: `http://192.168.200.115:16080` → 외부 `http://183.101.26.137:16080`
+내부 접속: `http://192.168.200.115:16000`
+
+외부 예정 주소는 `http://183.101.26.137:16080`입니다. 현재는 NAT가 설정되지 않아 접속할 수 없으며, `183.101.26.137:16080` → `192.168.200.115:16000` DNAT와 인바운드 방화벽 허용 후 사용합니다.
 
 ### 6-4. 포트가 확정되면
 
@@ -348,7 +408,7 @@ bash scripts/deploy.sh logs
 > 이 범위를 벗어난 포트로 띄우면 서버 안에서는 접속되지만 외부에서는 닿지 않습니다.
 
 ```bash
-sed -i 's/^APP_PORT=.*/APP_PORT=16080/' .env
+sed -i 's/^APP_PORT=.*/APP_PORT=16000/' .env
 bash scripts/deploy.sh down && bash scripts/deploy.sh up
 ```
 
@@ -377,7 +437,7 @@ DB 서버(`wr-db`)도 동일하게 등록하세요.
 
 | 변수 | 기본값 | 설명 |
 |---|---|---|
-| `APP_PORT` | `16080` | 호스트에 노출할 포트. **운영 서버는 16000~16999 만 개방** |
+| `APP_PORT` | `16000` | 호스트에 노출할 포트. **운영 서버는 16000~16999 만 개방** |
 | `SESSION_SECRET` | — | **필수**. 세션 쿠키 서명 키. `openssl rand -hex 32` |
 | `SESSION_TTL_SECONDS` | `43200` | 세션 유지 시간(초). 기본 12시간 |
 | `COOKIE_SECURE` | `false` | HTTPS 로 서비스하면 `true` |
@@ -522,7 +582,7 @@ bash scripts/deploy.sh restart
 bash scripts/backup.sh /backup
 
 # cron 등록 예 — 매일 새벽 2시
-0 2 * * * cd /opt/weekly-report && bash scripts/backup.sh /backup >> /var/log/wr-backup.log 2>&1
+0 2 * * * cd /home/bi/weekly-report-gcp && bash scripts/backup.sh /backup >> /var/log/wr-backup.log 2>&1
 
 # 복원
 bash scripts/restore.sh /backup/wr-20260818-020000.sql.gz /backup/wr-20260818-020000.uploads.tar.gz
@@ -556,7 +616,7 @@ bash scripts/restore.sh /backup/wr-20260818-020000.sql.gz /backup/wr-20260818-02
 ## 11. 디렉터리 구조
 
 ```
-weekly-report/
+weekly-report-gcp/
 ├── Containerfile                 APP 이미지 (멀티스테이지 불필요 — 프론트 빌드 없음)
 ├── docker-compose.yml            개발/올인원 (DB + APP)
 ├── docker-compose.db.yml         DB 서버 전용 (192.168.200.116)
@@ -564,8 +624,8 @@ weekly-report/
 ├── .env.example                  환경변수 템플릿
 ├── db/
 │   ├── init/
-│   ├── 01_schema.sql             테이블·인덱스·트리거·뷰
-│   └── 02_seed.sql               기관·주차 초기 데이터
+│   │   ├── 01_schema.sql         테이블·인덱스·트리거·뷰
+│   │   └── 02_seed.sql           기관·주차 초기 데이터
 │   └── migrations/               기존 DB 순차 마이그레이션
 ├── server/
 │   ├── package.json              의존성 4개 (express, pg, multer, cookie-parser)
@@ -577,6 +637,8 @@ weekly-report/
 │   ├── login.html / app.html / admin.html
 │   ├── css/style.css
 │   └── js/                       api, editor, login, app, admin
+├── uploads/                      증적자료 호스트 저장소 (git 제외)
+│   └── <report_id>/<uuid>.<ext>  보고서별 실제 첨부파일
 └── scripts/
     ├── gen-secrets.sh            .env 비밀값 생성
     ├── apply-schema.sh           기존 DB 에 스키마 적용
